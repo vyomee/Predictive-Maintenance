@@ -35,7 +35,7 @@ The project leverages the following components:
 1.  Clone this repository:
 
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/vyomee/Predictive-Maintenance/
     cd <repository_directory>
     ```
 
