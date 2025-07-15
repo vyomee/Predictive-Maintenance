@@ -107,6 +107,7 @@ with col1:
             else:
                 rand_values[feat] = np.random.uniform(low, high)
 
+        rand_data = pd.DataFrame([rand_values])
         rand_data = rand_data[model.feature_names_in_]
         pred_proba = model.predict_proba(rand_data)[0]
         failure_probability = pred_proba[1]
