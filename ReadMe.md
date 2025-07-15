@@ -36,7 +36,7 @@ The project leverages the following components:
 
     ```bash
     git clone https://github.com/vyomee/Predictive-Maintenance/
-    cd <repository_directory>
+    cd Predictive-Maintenance
     ```
 
 2.  Install the required Python packages:
