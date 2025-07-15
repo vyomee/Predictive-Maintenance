@@ -1,44 +1,59 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
+import joblib  # For loading the pre-trained models
 
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Predictive Maintenance: RUL Estimator",
-    page_icon="🛠️",
-    layout="wide",
+    page_icon="🤖",
+    layout="wide"
 )
 
-# --- Load Model ---
-# Ensure you have your trained RandomForestClassifier model saved as 'random_forest_model.joblib'
+# --- Model, Feature Loading, and Helper Functions ---
 try:
+    # Load the pre-trained Random Forest model
     model = joblib.load("random_forest_model.joblib")
-    # feature_columns must be in the same order as the model was trained on
-    feature_columns = model.feature_names_in_
 except FileNotFoundError:
-    st.error("Error: The model file 'random_forest_model.joblib' was not found.")
-    st.info("Please make sure your trained Random Forest model is saved in the correct path and contains the feature names.")
-    model = None
-    feature_columns = [] # Set to empty if model fails to load
+        st.error("Model file not found. Please ensure 'random_forest_model.joblib' is in the root directory.")
+        st.stop()
 
+# This is the full list of 79 features the model was trained on
+feature_columns = [
+    'age', 'day_cos', 'day_of_month', 'day_of_week', 'day_sin', 'hour', 'hour_cos', 'hour_sin', 'month', 'model',
+    'pressure', 'pressure_lag_12h', 'pressure_lag_1h', 'pressure_lag_3h', 'pressure_lag_6h',
+    'pressure_rolling_max_12h', 'pressure_rolling_max_24h', 'pressure_rolling_max_6h', 'pressure_rolling_mean_12h',
+    'pressure_rolling_mean_24h', 'pressure_rolling_mean_6h', 'pressure_rolling_min_12h', 'pressure_rolling_min_24h',
+    'pressure_rolling_min_6h', 'pressure_rolling_std_12h', 'pressure_rolling_std_24h', 'pressure_rolling_std_6h',
+    'quarter', 'rotate', 'rotate_lag_12h', 'rotate_lag_1h', 'rotate_lag_3h', 'rotate_lag_6h',
+    'rotate_rolling_max_12h', 'rotate_rolling_max_24h', 'rotate_rolling_max_6h', 'rotate_rolling_mean_12h',
+    'rotate_rolling_mean_24h', 'rotate_rolling_mean_6h', 'rotate_rolling_min_12h', 'rotate_rolling_min_24h',
+    'rotate_rolling_min_6h', 'rotate_rolling_std_12h', 'rotate_rolling_std_24h', 'rotate_rolling_std_6h',
+    'vibration', 'vibration_lag_12h', 'vibration_lag_1h', 'vibration_lag_3h', 'vibration_lag_6h',
+    'vibration_rolling_max_12h', 'vibration_rolling_max_24h', 'vibration_rolling_max_6h',
+    'vibration_rolling_mean_12h', 'vibration_rolling_mean_24h', 'vibration_rolling_mean_6h',
+    'vibration_rolling_min_12h', 'vibration_rolling_min_24h', 'vibration_rolling_min_6h',
+    'vibration_rolling_std_12h', 'vibration_rolling_std_24h', 'vibration_rolling_std_6h', 'volt',
+    'volt_lag_12h', 'volt_lag_1h', 'volt_lag_3h', 'volt_lag_6h', 'volt_rolling_max_12h', 'volt_rolling_max_24h',
+    'volt_rolling_max_6h', 'volt_rolling_mean_12h', 'volt_rolling_mean_24h', 'volt_rolling_mean_6h',
+    'volt_rolling_min_12h', 'volt_rolling_min_24h', 'volt_rolling_min_6h', 'volt_rolling_std_12h',
+    'volt_rolling_std_24h', 'volt_rolling_std_6h', 'model'
+]
 
-# --- UI Elements ---
-st.title("⚙️ Remaining Useful Life (RUL) Estimator")
-st.write(
-    "This app uses a Random Forest model to predict the RUL of a machine. "
-    "Enter the machine's expected lifespan and click the button to generate random sensor data and see the prediction."
-)
+# --- Helper Function for RUL Calculation ---
+def calculate_rul(failure_probability):
+    """
+    Calculates Remaining Useful Life (RUL) percentage based on predicted failure probability.
 
-st.sidebar.header("Machine Lifespan")
-lifespan_value = st.sidebar.number_input(
-    "Enter the expected total lifespan:", min_value=1.0, value=20000.0, step=1000.0, format="%.1f"
-)
-lifespan_unit = st.sidebar.selectbox(
-    "Select the time unit for the lifespan:", ["Hours", "Months", "Years"]
-)
+    Args:
+        failure_probability: Predicted probability of failure (float between 0 and 1).
 
-st.divider()
+    Returns:
+        Remaining Useful Life (RUL) percentage (float between 0 and 1).
+    """
+    rul = 1 - failure_probability
+    return max(0, min(1, rul))  # Ensure RUL is between 0 and 1
+
 # --- App Title and Description ---
 st.title("⚙️ Predictive Maintenance: Failure Predictor")
 
@@ -77,23 +92,19 @@ with st.sidebar:
     - **Rolling Features:** Mean, standard deviation, min, and max over 6, 12, and 24-hour windows.
     - **Lag Features:** Sensor values from 1, 3, 6, and 12 hours prior.
     - **Time Features:** Cyclical representations of hour and day.
-   """)
+    """)
 
-# --- Live Prediction Section ---
 st.header("Live Failure Prediction")
 
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    generate_button = st.button("Generate & Predict", type="primary", use_container_width=True)
-
-with col2:
-    if model and generate_button:
-        # These data ranges are based on your provided snippet.
-        # They should align with the .describe() output from your final training data.
+    if st.button("Generate & Predict", type="primary", use_container_width=True):
+        # NOTE: The data ranges are ESTIMATES. For better results, these should be
+        # updated with the .describe() output from your final training data.
         data_ranges = {
             'age': (0, 20), 'day_cos': (-1, 1), 'day_of_month': (1, 31), 'day_of_week': (0, 6), 'day_sin': (-1, 1),
-            'hour': (0, 23), 'hour_cos': (-1, 1), 'hour_sin': (-1, 1), 'month': (1, 12), 'model': (0, 3),
+            'hour': (0, 23), 'hour_cos': (-1, 1), 'hour_sin': (-1, 1), 'month': (1, 12), 'model': (0, 3), # Model is label encoded
             'pressure': (90, 110), 'pressure_lag_12h': (90, 110), 'pressure_lag_1h': (90, 110),
             'pressure_lag_3h': (90, 110), 'pressure_lag_6h': (90, 110), 'pressure_rolling_max_12h': (100, 130),
             'pressure_rolling_max_24h': (100, 140), 'pressure_rolling_max_6h': (100, 120), 'pressure_rolling_mean_12h': (90, 110),
@@ -119,51 +130,64 @@ with col2:
             'volt_rolling_std_6h': (5, 10)
         }
 
-        # Generate a dictionary of random values, ensuring feature order matches the model's training columns
-        rand_values = {}
-        for feat in feature_columns:
-            if feat not in data_ranges:
-                st.warning(f"Warning: Feature '{feat}' was in the model but not in the data_ranges dict. Using default value 0.")
-                rand_values[feat] = 0
-                continue
-
-            low, high = data_ranges[feat]
-            if feat in ['model', 'day_of_month', 'day_of_week', 'hour', 'month', 'quarter', 'age']:
-                 rand_values[feat] = np.random.randint(low, high + 1)
-            else:
-                 rand_values[feat] = np.random.uniform(low, high)
-
+        # Generate random data for each feature based on its defined range
+        rand_values = [
+            np.random.uniform(low, high) if feat != 'model' else np.random.randint(low, high + 1)
+            for feat, (low, high) in data_ranges.items()
+        ]
+        
         # Create a DataFrame from the generated values
         rand_data = pd.DataFrame([rand_values], columns=feature_columns)
+        
+        # Make prediction using the loaded model
+        # Use predict_proba to get the probability of failure (class 1)
+        pred_proba = model.predict_proba(rand_data)[0]
+        failure_probability = pred_proba[1]
 
-        # Make prediction to get probabilities
-        # predict_proba returns [[P(class_0), P(class_1)]]
-        prediction_proba = model.predict_proba(rand_data)
+        # Calculate RUL
+        rul_percentage = calculate_rul(failure_probability)
+        
+        # Store results in session state to display them
+        st.session_state['rul_percentage'] = rul_percentage
+        st.session_state['rand_data'] = rand_data
 
-        # RUL is the probability of "non-failure" (Class 0)
-        rul_percentage = prediction_proba[0][0] * 100
-        failure_probability = prediction_proba[0][1] * 100
+        # --- Lifespan Input and RUL Calculation ---
+        st.write("---")
+        st.write("#### Calculate RUL from Expected Lifespan")
+        col3, col4 = st.columns(2)
+        with col3:
+            lifespan = st.number_input("Enter expected lifespan:", min_value=1, step=1)
+        with col4:
+            unit = st.selectbox("Select unit:", ["Hours", "Months", "Years"])
 
-        # Calculate RUL value based on user input
-        rul_value = (rul_percentage / 100) * lifespan_value
+        if st.button("Calculate RUL from Lifespan", use_container_width=True):
+            if unit == "Hours":
+                estimated_rul = lifespan * rul_percentage
+            elif unit == "Months":
+                estimated_rul = (lifespan * rul_percentage)
+            else:  # Years
+                estimated_rul = (lifespan * rul_percentage)
+            st.success(f"Estimated RUL: {estimated_rul:.2f} {unit.lower()}")
 
-        # --- Display Results ---
-        st.subheader("Prediction Results")
-        st.info(f"The model predicts a **{failure_probability:.2f}% probability of failure** based on this data.")
+with col2:
+    if 'rul_percentage' in st.session_state:
+        rul_percentage = st.session_state['rul_percentage']
 
-        res_col1, res_col2 = st.columns(2)
-        with res_col1:
-            st.metric(
-                label="Remaining Useful Life (RUL)",
-                value=f"{rul_percentage:.2f}%",
-            )
-        with res_col2:
-            st.metric(
-                label=f"RUL in {lifespan_unit}",
-                value=f"{rul_value:.2f}",
-            )
+        # Display the prediction with a clear status message
+        st.write("#### Prediction Result: Remaining Useful Life (RUL)")
+        if rul_percentage < 0.3:
+            st.error(f"**Status:** Critical (RUL: {rul_percentage:.0%})", icon="🚨")
+            interpretation = "The model predicts a **critical RUL**, indicating imminent failure. Immediate maintenance is required."
+        elif rul_percentage < 0.7:
+            st.warning(f"**Status:** Approaching Maintenance (RUL: {rul_percentage:.0%})", icon="⚠️")
+            interpretation = "The model suggests the machine is **approaching the need for maintenance**. Please schedule maintenance soon."
+        else:
+            st.success(f"**Status:** Operational (RUL: {rul_percentage:.0%})", icon="✅")
+            interpretation = "The model predicts the machine is in **good operational condition**. No immediate maintenance is needed."
+        st.info(interpretation)
 
+        # Show the generated data in an expander
         with st.expander("View Generated Sensor Data"):
-             st.dataframe(rand_data)
-    elif not model:
-         st.warning("Please load a model file to enable predictions.")
+            st.dataframe(st.session_state['rand_data'])
+    else:
+        st.info("Click the 'Generate & Predict' button to see the model's prediction.")
